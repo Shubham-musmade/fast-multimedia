@@ -26,27 +26,34 @@ async def get_current_user(request: Request) -> dict:
 
     if not token:
         raise UnauthorizedAccess("Not authenticated.")
-
+    print(token)    
+    print(settings.JWT_SECRET_KEY)
     try:
+        # Decode the token. jwt.decode will raise JWTError for invalid/expired tokens.
         payload = jwt.decode(
             token,
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
-        
+        print(payload)
+
         user_id = payload.get("user_id")
         email = payload.get("email")
 
-        if user_id is None or email is None:
-            raise UnauthorizedAccess("Invalid token payload")
+        if user_id is None:
+            raise UnauthorizedAccess("Invalid token payload: missing user_id")
 
+        # Accept numeric IDs or UUID/string IDs. Convert to int only if possible.
+        try:
+            user_id_value = int(user_id)
+        except (ValueError, TypeError):
+            user_id_value = user_id
         return {
-            "user_id": int(user_id),
-            "email": email,
-            "payload": payload  # optional, for debugging
+            "user_id": payload.get("user_id"),
+            "user_email": payload.get("email")
         }
 
     except JWTError as e:
         raise UnauthorizedAccess(f"Invalid token: {str(e)}")
-    except Exception as e:
+    except Exception:
         raise UnauthorizedAccess("Token validation failed")
