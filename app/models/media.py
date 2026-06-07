@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, BigInteger, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
@@ -9,9 +10,10 @@ Base = declarative_base()
 class MediaAsset(Base):
     __tablename__ = "media_assets"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     uuid = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    user_email = Column(String(255), nullable=False) 
     original_filename = Column(String(255), nullable=False)
     file_type = Column(String(10), nullable=False)  # extension
     mime_type = Column(String(100), nullable=False)

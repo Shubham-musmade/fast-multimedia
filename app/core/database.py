@@ -1,29 +1,42 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 from app.core.logging import log
 
-# Create async engine
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_pre_ping=True,           # Ensures connections are alive
-    pool_size=10,
-    max_overflow=20,
-    pool_timeout=30,
-)
+# Lazy-initialized async engine and sessionmaker to avoid creating
+# async IO objects at import time (which can trigger greenlet/asyncpg errors
+# when code is imported in a sync context such as Alembic).
+_async_engine = None
+_async_sessionmaker = None
 
-# Async session factory
-AsyncSessionLocal = async_sessionmaker(
-    bind=engine,
-    expire_on_commit=False,
-    autoflush=False,
-    autocommit=False,
-)
+def get_async_engine():
+    global _async_engine
+    if _async_engine is None:
+        _async_engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=settings.DEBUG,
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=30,
+        )
+    return _async_engine
+
+def get_async_sessionmaker():
+    global _async_sessionmaker
+    if _async_sessionmaker is None:
+        _async_sessionmaker = async_sessionmaker(
+            bind=get_async_engine(),
+            expire_on_commit=False,
+            autoflush=False,
+            autocommit=False,
+        )
+    return _async_sessionmaker
+
 
 async def get_db() -> AsyncSession:
     """Dependency for FastAPI to get DB session"""
-    async with AsyncSessionLocal() as session:
+    sessionmaker = get_async_sessionmaker()
+    async with sessionmaker() as session:
         try:
             yield session
         except Exception as e:

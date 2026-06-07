@@ -1,13 +1,28 @@
 from google.cloud import storage
+from google.oauth2 import service_account
 from fastapi import UploadFile
 from app.core.config import settings
 from datetime import datetime
 import os
+from app.core.logging import log
+
 
 class StorageService:
     def __init__(self):
-        self.client = storage.Client(project=settings.GCS_PROJECT_ID)
-        self.bucket = self.client.bucket(settings.GCS_BUCKET_NAME)
+        # Prefer explicit service account file if provided via settings
+        try:
+            if settings.GCS_CREDENTIALS_FILE:
+                if not os.path.exists(settings.GCS_CREDENTIALS_FILE):
+                    raise FileNotFoundError(f"GCS credentials file not found: {settings.GCS_CREDENTIALS_FILE}")
+                creds = service_account.Credentials.from_service_account_file(settings.GCS_CREDENTIALS_FILE)
+                self.client = storage.Client(project=settings.GCS_PROJECT_ID, credentials=creds)
+            else:
+                # Fall back to Application Default Credentials
+                self.client = storage.Client(project=settings.GCS_PROJECT_ID)
+            self.bucket = self.client.bucket(settings.GCS_BUCKET_NAME)
+        except Exception as e:
+            log.error(f"Failed to initialize GCS client: {e}")
+            raise
 
     def generate_storage_path(self, user_id: int, filename: str) -> str:
         now = datetime.utcnow()
@@ -21,11 +36,19 @@ class StorageService:
 
         # Stream upload (memory efficient)
         content = await file.read()
-        blob.upload_from_string(content, content_type=file.content_type)
+        try:
+            blob.upload_from_string(content, content_type=file.content_type)
+        except Exception as e:
+            log.error(f"Failed to upload to GCS: {e}")
+            raise
 
         return storage_path
 
     async def delete_file(self, storage_path: str):
         blob = self.bucket.blob(storage_path)
-        if blob.exists():
-            blob.delete()
+        try:
+            if blob.exists():
+                blob.delete()
+        except Exception as e:
+            log.error(f"Failed to delete from GCS: {e}")
+            raise

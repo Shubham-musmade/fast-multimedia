@@ -6,6 +6,8 @@ from app.services.media_service import MediaService
 from app.services.storage_service import StorageService
 from app.repositories.media_repository import MediaRepository
 from app.schemas.media import MediaAssetResponse, MediaListResponse
+from fastapi import HTTPException
+from app.core.logging import log
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -19,7 +21,12 @@ async def upload_media(
     storage = StorageService()
     service = MediaService(repo, storage)
 
-    media = await service.upload(file, current_user["user_id"])
+    try:
+        media = await service.upload(file, current_user["user_id"], current_user["user_email"])
+    except Exception as e:
+        log.error(f"Upload failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Storage error: {str(e)}")
+    print('media: ', media)
     return MediaAssetResponse(
         id=media.id,
         uuid=media.uuid,
@@ -38,21 +45,36 @@ async def list_media(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    repo = MediaRepository(db)
-    skip = (page - 1) * size
-    items, total = await repo.get_by_user(
-        user_id=current_user["user_id"],
-        skip=skip,
-        limit=size,
-        search=search,
-        file_type=file_type
-    )
-    return MediaListResponse(
-        items=[MediaAssetResponse.model_validate(item) for item in items],
-        total=total,
-        page=page,
-        size=size
-    )
+    try:
+        repo = MediaRepository(db)
+        skip = (page - 1) * size
+        items, total = await repo.get_by_user(
+            user_id=current_user["user_id"],
+            skip=skip,
+            limit=size,
+            search=search,
+            file_type=file_type
+        )
+        print('items: ', items, "total: ", total) 
+        return MediaListResponse(
+            items=[
+                MediaAssetResponse(
+                    id=item.id,
+                    uuid=item.uuid,
+                    filename=getattr(item, "original_filename", None),
+                    file_size=item.file_size,
+                    storage_path=item.storage_path,
+                    created_at=item.created_at,
+                )
+                for item in items
+            ],
+            total=total,
+            page=page,
+            size=size,
+        )
+    except Exception as e:
+        log.error(f"Failed to list media: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve media list")
 
 @router.get("/{media_id}", response_model=MediaAssetResponse)
 async def get_media(

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # GCS
     GCS_BUCKET_NAME: str
     GCS_PROJECT_ID: str | None = None
+    # Optional path to a Google service account JSON credentials file
+    GCS_CREDENTIALS_FILE: str | None = None
 
     # Limits
     MAX_UPLOAD_SIZE_MB: int = 50

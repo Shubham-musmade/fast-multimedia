@@ -9,7 +9,7 @@ class MediaService:
         self.repo = repo
         self.storage = storage
 
-    async def upload(self, file: UploadFile, user_id: int) -> MediaAsset:
+    async def upload(self, file: UploadFile, user_id: int, user_email: str) -> MediaAsset:
         # Validations
         ValidationService.validate_file_type(file)
         ValidationService.validate_file_size(file)
@@ -24,6 +24,7 @@ class MediaService:
         # Save metadata
         media = MediaAsset(
             user_id=user_id,
+            user_email=user_email,
             original_filename=file.filename,
             file_type=file.filename.split(".")[-1].lower(),
             mime_type=file.content_type or "application/octet-stream",
