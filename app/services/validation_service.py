@@ -22,3 +22,7 @@ class ValidationService:
         count = await repo.get_daily_upload_count(user_id)
         if count >= settings.DAILY_UPLOAD_LIMIT:
             raise UploadLimitExceeded(f"Daily upload limit of {settings.DAILY_UPLOAD_LIMIT} files exceeded")
+    @staticmethod
+    def validate_file_type_and_size(file: UploadFile):
+        ValidationService.validate_file_type(file)
+        ValidationService.validate_file_size(file)

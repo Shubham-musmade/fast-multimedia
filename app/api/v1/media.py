@@ -55,7 +55,20 @@ async def list_media(
             search=search,
             file_type=file_type
         )
-        print('items: ', items, "total: ", total) 
+        print(
+            [
+                MediaAssetResponse(
+                    id=item.id,
+                    uuid=item.uuid,
+                    filename=getattr(item, "original_filename", None),
+                    file_size=item.file_size,
+                    storage_path=item.storage_path,
+                    # storage_path=str(StorageService().generate_signed_url(item.storage_path)) if item.storage_path else None,
+                    created_at=item.created_at,
+                )
+                for item in items
+            ]
+        )
         return MediaListResponse(
             items=[
                 MediaAssetResponse(
